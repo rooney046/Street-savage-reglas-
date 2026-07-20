@@ -70,7 +70,7 @@ async def on_ready():
         await tree.sync()  # global, puede tardar hasta 1 hora en aparecer
 
     print(f"✅ Bot conectado como: {client.user}")
-   
+ await client.change_presence(activity=discord.Game(name="/reglas /kick /xp"))  
 
 
 # ── XP: almacenamiento en JSON ──────────────────────────────
