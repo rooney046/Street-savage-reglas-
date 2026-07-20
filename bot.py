@@ -27,8 +27,7 @@ TEXTOS = {
     "es": {
         "reglas_ok": "✅ Mensaje enviado en {canal}",
         "kick_ok": "👢 **{usuario}** fue expulsado. Razón: {razon}",
-        "kick_rol_alto": "❌ No puedo expulsar a ese usuario (su rol es igual o superior al mío).",
-        "kick_sin_permisos": "❌ No tengo permisos suficientes para expulsar a ese usuario.",
+        "kick_sin_permisos": "❌ No pude expulsar a ese usuario. Revisa que el rol de mi bot esté más arriba que el del usuario en Configuración del servidor > Roles.",
         "xp_ok": "✨ **{usuario}** ahora tiene **{total}** XP ({signo}{cantidad}).",
         "nivel_ok": "📊 **{usuario}** tiene **{xp}** XP.",
         "sin_permiso": "❌ No tienes permisos para usar este comando.",
@@ -36,8 +35,7 @@ TEXTOS = {
     "en": {
         "reglas_ok": "✅ Message sent in {canal}",
         "kick_ok": "👢 **{usuario}** was kicked. Reason: {razon}",
-        "kick_rol_alto": "❌ I can't kick that user (their role is equal to or higher than mine).",
-        "kick_sin_permisos": "❌ I don't have enough permissions to kick that user.",
+        "kick_sin_permisos": "❌ I couldn't kick that user. Make sure my bot's role is above the user's role in Server Settings > Roles.",
         "xp_ok": "✨ **{usuario}** now has **{total}** XP ({signo}{cantidad}).",
         "nivel_ok": "📊 **{usuario}** has **{xp}** XP.",
         "sin_permiso": "❌ You don't have permission to use this command.",
@@ -45,8 +43,7 @@ TEXTOS = {
     "pt": {
         "reglas_ok": "✅ Mensagem enviada em {canal}",
         "kick_ok": "👢 **{usuario}** foi expulso. Motivo: {razon}",
-        "kick_rol_alto": "❌ Não posso expulsar esse usuário (o cargo dele é igual ou superior ao meu).",
-        "kick_sin_permisos": "❌ Não tenho permissões suficientes para expulsar esse usuário.",
+        "kick_sin_permisos": "❌ Não consegui expulsar esse usuário. Verifique se o cargo do meu bot está acima do cargo do usuário em Configurações do servidor > Cargos.",
         "xp_ok": "✨ **{usuario}** agora tem **{total}** XP ({signo}{cantidad}).",
         "nivel_ok": "📊 **{usuario}** tem **{xp}** XP.",
         "sin_permiso": "❌ Você não tem permissão para usar este comando.",
@@ -70,7 +67,6 @@ async def on_ready():
         await tree.sync()  # global, puede tardar hasta 1 hora en aparecer
 
     print(f"✅ Bot conectado como: {client.user}")
- await client.change_presence(activity=discord.Game(name="/reglas /kick /xp"))  
 
 
 # ── XP: almacenamiento en JSON ──────────────────────────────
@@ -119,10 +115,6 @@ async def reglas(interaction: discord.Interaction, canal: discord.TextChannel, t
 )
 async def kick(interaction: discord.Interaction, usuario: discord.Member, razon: str = "Sin razón especificada"):
     gid = interaction.guild.id
-
-    if usuario.top_role >= interaction.guild.me.top_role:
-        await interaction.response.send_message(t(gid, "kick_rol_alto"), ephemeral=True)
-        return
 
     try:
         await usuario.kick(reason=razon)
