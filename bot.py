@@ -31,6 +31,8 @@ TEXTOS = {
         "xp_ok": "✨ **{usuario}** ahora tiene **{total}** XP ({signo}{cantidad}).",
         "nivel_ok": "📊 **{usuario}** tiene **{xp}** XP.",
         "sin_permiso": "❌ No tienes permisos para usar este comando.",
+        "bienvenida_titulo": "👋 ¡Bienvenido a {servidor}!",
+        "bienvenida_desc": "Hola {usuario}, gracias por unirte. Recuerda leer las reglas del servidor para que todo vaya bien.",
     },
     "en": {
         "reglas_ok": "✅ Message sent in {canal}",
@@ -39,6 +41,8 @@ TEXTOS = {
         "xp_ok": "✨ **{usuario}** now has **{total}** XP ({signo}{cantidad}).",
         "nivel_ok": "📊 **{usuario}** has **{xp}** XP.",
         "sin_permiso": "❌ You don't have permission to use this command.",
+        "bienvenida_titulo": "👋 Welcome to {servidor}!",
+        "bienvenida_desc": "Hi {usuario}, thanks for joining. Make sure to read the server rules so everything goes smoothly.",
     },
     "pt": {
         "reglas_ok": "✅ Mensagem enviada em {canal}",
@@ -47,6 +51,8 @@ TEXTOS = {
         "xp_ok": "✨ **{usuario}** agora tem **{total}** XP ({signo}{cantidad}).",
         "nivel_ok": "📊 **{usuario}** tem **{xp}** XP.",
         "sin_permiso": "❌ Você não tem permissão para usar este comando.",
+        "bienvenida_titulo": "👋 Bem-vindo(a) a {servidor}!",
+        "bienvenida_desc": "Olá {usuario}, obrigado por entrar. Não esqueça de ler as regras do servidor.",
     },
 }
 
@@ -67,6 +73,33 @@ async def on_ready():
         await tree.sync()  # global, puede tardar hasta 1 hora en aparecer
 
     print(f"✅ Bot conectado como: {client.user}")
+
+
+# ── Bienvenida por privado (DM) ─────────────────────────────
+@client.event
+async def on_member_join(usuario: discord.Member):
+    embed = discord.Embed(
+        title=f"👋 ¡Bienvenido a {usuario.guild.name}! / Welcome to {usuario.guild.name}!",
+        color=discord.Color.green(),
+    )
+    embed.add_field(
+        name="🇪🇸 Español",
+        value=f"Hola {usuario.mention}, gracias por unirte. Recuerda leer las reglas del servidor para que todo vaya bien.",
+        inline=False,
+    )
+    embed.add_field(
+        name="🇬🇧 English",
+        value=f"Hi {usuario.mention}, thanks for joining. Make sure to read the server rules so everything goes smoothly.",
+        inline=False,
+    )
+    if usuario.guild.icon:
+        embed.set_thumbnail(url=usuario.guild.icon.url)
+
+    try:
+        await usuario.send(embed=embed)
+    except discord.Forbidden:
+        # El usuario tiene los DMs cerrados para ese servidor/bot, no se puede hacer nada.
+        pass
 
 
 # ── XP: almacenamiento en JSON ──────────────────────────────
