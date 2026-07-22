@@ -33,6 +33,9 @@ TEXTOS = {
         "sin_permiso": "❌ No tienes permisos para usar este comando.",
         "bienvenida_titulo": "👋 ¡Bienvenido a {servidor}!",
         "bienvenida_desc": "Hola {usuario}, gracias por unirte. Recuerda leer las reglas del servidor para que todo vaya bien.",
+        "rol_ok": "✅ Se le dio el rol **{rol}** a **{usuario}**.",
+        "rol_ya_tiene": "⚠️ **{usuario}** ya tiene el rol **{rol}**.",
+        "rol_sin_permisos": "❌ No pude darle ese rol. Revisa que el rol de mi bot esté más arriba que el rol que intento asignar, en Configuración del servidor > Roles.",
     },
     "en": {
         "reglas_ok": "✅ Message sent in {canal}",
@@ -43,6 +46,9 @@ TEXTOS = {
         "sin_permiso": "❌ You don't have permission to use this command.",
         "bienvenida_titulo": "👋 Welcome to {servidor}!",
         "bienvenida_desc": "Hi {usuario}, thanks for joining. Make sure to read the server rules so everything goes smoothly.",
+        "rol_ok": "✅ Gave the **{rol}** role to **{usuario}**.",
+        "rol_ya_tiene": "⚠️ **{usuario}** already has the **{rol}** role.",
+        "rol_sin_permisos": "❌ I couldn't assign that role. Make sure my bot's role is above the role I'm trying to assign, in Server Settings > Roles.",
     },
     "pt": {
         "reglas_ok": "✅ Mensagem enviada em {canal}",
@@ -53,6 +59,9 @@ TEXTOS = {
         "sin_permiso": "❌ Você não tem permissão para usar este comando.",
         "bienvenida_titulo": "👋 Bem-vindo(a) a {servidor}!",
         "bienvenida_desc": "Olá {usuario}, obrigado por entrar. Não esqueça de ler as regras do servidor.",
+        "rol_ok": "✅ O cargo **{rol}** foi dado a **{usuario}**.",
+        "rol_ya_tiene": "⚠️ **{usuario}** já tem o cargo **{rol}**.",
+        "rol_sin_permisos": "❌ Não consegui dar esse cargo. Verifique se o cargo do meu bot está acima do cargo que estou tentando atribuir, em Configurações do servidor > Cargos.",
     },
 }
 
@@ -176,6 +185,27 @@ async def xp(interaction: discord.Interaction, usuario: discord.Member, cantidad
     )
 
 
+# ── /rol ─────────────────────────────────────────────────────
+@tree.command(name="rol", description="Le da un rol a un usuario")
+@app_commands.checks.has_permissions(manage_roles=True)
+@app_commands.describe(
+    usuario="Usuario al que le darás el rol",
+    rol="Rol que quieres asignar",
+)
+async def rol(interaction: discord.Interaction, usuario: discord.Member, rol: discord.Role):
+    gid = interaction.guild.id
+
+    if rol in usuario.roles:
+        await interaction.response.send_message(t(gid, "rol_ya_tiene", usuario=usuario, rol=rol.name), ephemeral=True)
+        return
+
+    try:
+        await usuario.add_roles(rol)
+        await interaction.response.send_message(t(gid, "rol_ok", usuario=usuario, rol=rol.name))
+    except discord.Forbidden:
+        await interaction.response.send_message(t(gid, "rol_sin_permisos"), ephemeral=True)
+
+
 # ── /nivel (consultar XP) ───────────────────────────────────
 @tree.command(name="nivel", description="Muestra el XP de un usuario")
 @app_commands.describe(usuario="Usuario a consultar (por defecto, tú mismo)")
@@ -191,6 +221,7 @@ async def nivel(interaction: discord.Interaction, usuario: discord.Member = None
 @reglas.error
 @kick.error
 @xp.error
+@rol.error
 async def comandos_error(interaction: discord.Interaction, error):
     if isinstance(error, app_commands.MissingPermissions):
         await interaction.response.send_message(t(interaction.guild.id, "sin_permiso"), ephemeral=True)
@@ -205,3 +236,4 @@ if not DISCORD_TOKEN:
     )
 
 client.run(DISCORD_TOKEN)
+                 
