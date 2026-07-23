@@ -36,6 +36,12 @@ TEXTOS = {
         "rol_ok": "✅ Se le dio el rol **{rol}** a **{usuario}**.",
         "rol_ya_tiene": "⚠️ **{usuario}** ya tiene el rol **{rol}**.",
         "rol_sin_permisos": "❌ No pude darle ese rol. Revisa que el rol de mi bot esté más arriba que el rol que intento asignar, en Configuración del servidor > Roles.",
+        "malapalabra_titulo": "⚠️ Advertencia — Mala palabra detectada",
+        "malapalabra_usuario": "Usuario",
+        "malapalabra_canal": "Canal",
+        "malapalabra_palabra": "Palabra detectada",
+        "malapalabra_mensaje": "Mensaje original",
+        "malapalabra_aviso_usuario": "🚫 {usuario}, tu mensaje fue eliminado por contener lenguaje ofensivo.",
     },
     "en": {
         "reglas_ok": "✅ Message sent in {canal}",
@@ -49,6 +55,12 @@ TEXTOS = {
         "rol_ok": "✅ Gave the **{rol}** role to **{usuario}**.",
         "rol_ya_tiene": "⚠️ **{usuario}** already has the **{rol}** role.",
         "rol_sin_permisos": "❌ I couldn't assign that role. Make sure my bot's role is above the role I'm trying to assign, in Server Settings > Roles.",
+        "malapalabra_titulo": "⚠️ Warning — Bad word detected",
+        "malapalabra_usuario": "User",
+        "malapalabra_canal": "Channel",
+        "malapalabra_palabra": "Detected word",
+        "malapalabra_mensaje": "Original message",
+        "malapalabra_aviso_usuario": "🚫 {usuario}, your message was removed for containing offensive language.",
     },
     "pt": {
         "reglas_ok": "✅ Mensagem enviada em {canal}",
@@ -62,6 +74,12 @@ TEXTOS = {
         "rol_ok": "✅ O cargo **{rol}** foi dado a **{usuario}**.",
         "rol_ya_tiene": "⚠️ **{usuario}** já tem o cargo **{rol}**.",
         "rol_sin_permisos": "❌ Não consegui dar esse cargo. Verifique se o cargo do meu bot está acima do cargo que estou tentando atribuir, em Configurações do servidor > Cargos.",
+        "malapalabra_titulo": "⚠️ Aviso — Palavra ofensiva detectada",
+        "malapalabra_usuario": "Usuário",
+        "malapalabra_canal": "Canal",
+        "malapalabra_palabra": "Palavra detectada",
+        "malapalabra_mensaje": "Mensagem original",
+        "malapalabra_aviso_usuario": "🚫 {usuario}, sua mensagem foi removida por conter linguagem ofensiva.",
     },
 }
 
@@ -82,6 +100,68 @@ async def on_ready():
         await tree.sync()  # global, puede tardar hasta 1 hora en aparecer
 
     print(f"✅ Bot conectado como: {client.user}")
+
+
+# ── Anti malas palabras (inglés) ─────────────────────────────
+import re
+
+MALAS_PALABRAS = [
+    "fuck", "shit", "bitch", "asshole", "bastard", "cunt", "dick",
+    "piss", "slut", "whore", "faggot", "nigger", "retard",
+]
+PATRON_MALAS_PALABRAS = re.compile(
+    r"\b(" + "|".join(re.escape(p) for p in MALAS_PALABRAS) + r")\b",
+    re.IGNORECASE,
+)
+
+NOMBRE_CANAL_ADVERTENCIAS = "advertencias"
+
+
+def contiene_mala_palabra(texto: str):
+    coincidencia = PATRON_MALAS_PALABRAS.search(texto)
+    return coincidencia.group(0) if coincidencia else None
+
+
+@client.event
+async def on_message(message: discord.Message):
+    if message.author.bot or not message.guild:
+        return
+
+    palabra_detectada = contiene_mala_palabra(message.content)
+    if palabra_detectada:
+        gid = message.guild.id
+        contenido_original = message.content
+        canal_origen = message.channel
+
+        try:
+            await message.delete()
+        except discord.Forbidden:
+            pass
+
+        try:
+            await message.channel.send(
+                t(gid, "malapalabra_aviso_usuario", usuario=message.author.mention),
+                delete_after=6,
+            )
+        except discord.Forbidden:
+            pass
+
+        canal_advertencias = discord.utils.get(
+            message.guild.text_channels, name=NOMBRE_CANAL_ADVERTENCIAS
+        )
+        if canal_advertencias:
+            embed = discord.Embed(
+                title=t(gid, "malapalabra_titulo"),
+                color=discord.Color.orange(),
+            )
+            embed.add_field(name=t(gid, "malapalabra_usuario"), value=message.author.mention, inline=True)
+            embed.add_field(name=t(gid, "malapalabra_canal"), value=canal_origen.mention, inline=True)
+            embed.add_field(name=t(gid, "malapalabra_palabra"), value=f"`{palabra_detectada}`", inline=True)
+            embed.add_field(name=t(gid, "malapalabra_mensaje"), value=contenido_original[:1000], inline=False)
+            try:
+                await canal_advertencias.send(embed=embed)
+            except discord.Forbidden:
+                pass
 
 
 # ── Bienvenida por privado (DM) ─────────────────────────────
@@ -236,4 +316,3 @@ if not DISCORD_TOKEN:
     )
 
 client.run(DISCORD_TOKEN)
-                 
