@@ -416,10 +416,11 @@ PREGUNTAS_APPLY = {
 _aplicaciones_activas = set()
 
 
-async def iniciar_postulacion(interaction: discord.Interaction):
+async def iniciar_postulacion(interaction: discord.Interaction, idioma_forzado: str = None):
     gid = interaction.guild.id
     guild = interaction.guild
     usuario = interaction.user
+    idioma_usar = idioma_forzado or idioma_servidor.get(gid, "es")
 
     if usuario.id in _aplicaciones_activas:
         await interaction.response.send_message(t(gid, "apply_ya_activa"), ephemeral=True)
@@ -427,7 +428,7 @@ async def iniciar_postulacion(interaction: discord.Interaction):
 
     try:
         canal_dm = await usuario.create_dm()
-        preguntas = PREGUNTAS_APPLY.get(idioma_servidor.get(gid, "es"), PREGUNTAS_APPLY["es"])
+        preguntas = PREGUNTAS_APPLY.get(idioma_usar, PREGUNTAS_APPLY["es"])
         await canal_dm.send(t(gid, "apply_intro", n=len(preguntas)))
     except discord.Forbidden:
         await interaction.response.send_message(t(gid, "apply_dm_cerrado"), ephemeral=True)
@@ -469,6 +470,23 @@ async def iniciar_postulacion(interaction: discord.Interaction):
         _aplicaciones_activas.discard(usuario.id)
 
 
+class SeleccionIdiomaApplyView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=300)
+
+    @discord.ui.button(label="🇪🇸 Español", style=discord.ButtonStyle.secondary)
+    async def boton_es(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await iniciar_postulacion(interaction, idioma_forzado="es")
+
+    @discord.ui.button(label="🇬🇧 English", style=discord.ButtonStyle.secondary)
+    async def boton_en(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await iniciar_postulacion(interaction, idioma_forzado="en")
+
+    @discord.ui.button(label="🇧🇷 Português", style=discord.ButtonStyle.secondary)
+    async def boton_pt(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await iniciar_postulacion(interaction, idioma_forzado="pt")
+
+
 class PanelApplyView(discord.ui.View):
     def __init__(self, etiqueta_boton="📋 Aplicar a Staff"):
         super().__init__(timeout=None)
@@ -476,7 +494,11 @@ class PanelApplyView(discord.ui.View):
 
     @discord.ui.button(style=discord.ButtonStyle.blurple, custom_id="panel_apply_boton")
     async def boton_aplicar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await iniciar_postulacion(interaction)
+        await interaction.response.send_message(
+            "🌐 Choose your language / Elige tu idioma / Escolha seu idioma:",
+            view=SeleccionIdiomaApplyView(),
+            ephemeral=True,
+        )
 
 
 @tree.command(name="apply", description="Publica el panel para que la gente aplique a Staff")
