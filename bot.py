@@ -22,7 +22,23 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 # ── Sistema de idiomas ─────────────────────────────────────
-idioma_servidor = {}
+IDIOMA_FILE = "idioma_data.json"
+
+
+def cargar_idiomas() -> dict:
+    if not os.path.exists(IDIOMA_FILE):
+        return {}
+    with open(IDIOMA_FILE, "r", encoding="utf-8") as f:
+        # las claves se guardan como texto en JSON, las convertimos a int
+        return {int(k): v for k, v in json.load(f).items()}
+
+
+def guardar_idiomas(data: dict) -> None:
+    with open(IDIOMA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+idioma_servidor = cargar_idiomas()
 
 TEXTOS = {
     "es": {
@@ -51,6 +67,10 @@ TEXTOS = {
         "apply_intro": "📋 **Postulación para Staff**\nTe voy a hacer {n} preguntas, una por una. Responde cada una con un mensaje normal. Tienes 10 minutos por pregunta.",
         "apply_final": "✅ ¡Listo! Tu postulación fue enviada al staff. Te avisarán pronto.",
         "apply_enviada_canal": "📥 Nueva postulación de {usuario}",
+        "idioma_cambiado": "✅ Idioma del bot cambiado a **Español** 🇪🇸",
+        "apply_panel_titulo": "📋 Postulación para Staff",
+        "apply_panel_desc": "¿Quieres unirte al equipo de Staff? Dale clic al botón de abajo y te vamos a hacer algunas preguntas por mensaje privado.",
+        "apply_panel_boton": "📋 Aplicar a Staff",
     },
     "en": {
         "reglas_ok": "✅ Message sent in {canal}",
@@ -78,6 +98,10 @@ TEXTOS = {
         "apply_intro": "📋 **Staff Application**\nI'll ask you {n} questions, one at a time. Reply with a normal message. You have 10 minutes per question.",
         "apply_final": "✅ Done! Your application was sent to staff. They'll get back to you soon.",
         "apply_enviada_canal": "📥 New application from {usuario}",
+        "idioma_cambiado": "✅ Bot language changed to **English** 🇬🇧",
+        "apply_panel_titulo": "📋 Staff Application",
+        "apply_panel_desc": "Want to join the Staff team? Click the button below and we'll ask you a few questions by DM.",
+        "apply_panel_boton": "📋 Apply for Staff",
     },
     "pt": {
         "reglas_ok": "✅ Mensagem enviada em {canal}",
@@ -105,6 +129,10 @@ TEXTOS = {
         "apply_intro": "📋 **Candidatura para Staff**\nVou fazer {n} perguntas, uma de cada vez. Responda com uma mensagem normal. Você tem 10 minutos por pergunta.",
         "apply_final": "✅ Pronto! Sua candidatura foi enviada para o staff. Em breve entrarão em contato.",
         "apply_enviada_canal": "📥 Nova candidatura de {usuario}",
+        "idioma_cambiado": "✅ Idioma do bot alterado para **Português** 🇧🇷",
+        "apply_panel_titulo": "📋 Candidatura para Staff",
+        "apply_panel_desc": "Quer entrar para a equipe de Staff? Clique no botão abaixo e vamos te fazer algumas perguntas por DM.",
+        "apply_panel_boton": "📋 Candidatar-se a Staff",
     },
 }
 
@@ -321,23 +349,69 @@ async def traducir(interaction: discord.Interaction, texto: str, idioma: app_com
         await interaction.followup.send(t(gid, "traducir_error"), ephemeral=True)
 
 
+# ── /idioma ──────────────────────────────────────────────────
+@tree.command(name="idioma", description="Cambia el idioma en el que responde el bot en este servidor")
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.describe(idioma="Idioma que quieres que use el bot")
+@app_commands.choices(idioma=[
+    app_commands.Choice(name="Español", value="es"),
+    app_commands.Choice(name="English", value="en"),
+    app_commands.Choice(name="Português", value="pt"),
+])
+async def idioma(interaction: discord.Interaction, idioma: app_commands.Choice[str]):
+    gid = interaction.guild.id
+    idioma_servidor[gid] = idioma.value
+    guardar_idiomas(idioma_servidor)
+    await interaction.response.send_message(t(gid, "idioma_cambiado"))
+
+
 # ── /apply (panel de postulación de staff) ───────────────────
 CANAL_POSTULACIONES = "postulaciones"  # nombre exacto del canal donde llegan las respuestas
 
-PREGUNTAS_APPLY = [
-    "👤 **Información Personal**\n1️⃣ ¿Cuál es tu nombre de usuario en Discord?",
-    "2️⃣ ¿Qué edad tienes?",
-    "3️⃣ ¿Cuál es tu zona horaria?",
-    "4️⃣ ¿Cuántas horas al día puedes dedicar al servidor?",
-    "💼 **Experiencia**\n5️⃣ ¿Has sido Staff en otros servidores de Discord? Si tu respuesta es sí, incluye en el mismo mensaje: nombre del servidor, cargo que ocupabas, tiempo que estuviste y motivo por el que dejaste el cargo. Si no, responde 'No'.",
-    "6️⃣ ¿Has administrado un servidor propio?",
-    "7️⃣ ¿Qué bots sabes utilizar? (Dyno, Carl-bot, Ticket Tool, MEE6, Sapphire, etc.)",
-    "8️⃣ ¿Sabes configurar permisos, roles y canales? Explica tu nivel de experiencia.",
-    "📚 **Conocimientos**\n9️⃣ ¿Cuál es la función de un Moderador?",
-    "🔟 ¿Cuál es la diferencia entre un Moderador y un Administrador?",
-    "1️⃣1️⃣ ¿Qué harías antes de banear a un usuario?",
-    "1️⃣2️⃣ ¿Qué es el abuso de permisos?",
-]
+PREGUNTAS_APPLY = {
+    "es": [
+        "👤 **Información Personal**\n1️⃣ ¿Cuál es tu nombre de usuario en Discord?",
+        "2️⃣ ¿Qué edad tienes?",
+        "3️⃣ ¿Cuál es tu zona horaria?",
+        "4️⃣ ¿Cuántas horas al día puedes dedicar al servidor?",
+        "💼 **Experiencia**\n5️⃣ ¿Has sido Staff en otros servidores de Discord? Si tu respuesta es sí, incluye en el mismo mensaje: nombre del servidor, cargo que ocupabas, tiempo que estuviste y motivo por el que dejaste el cargo. Si no, responde 'No'.",
+        "6️⃣ ¿Has administrado un servidor propio?",
+        "7️⃣ ¿Qué bots sabes utilizar? (Dyno, Carl-bot, Ticket Tool, MEE6, Sapphire, etc.)",
+        "8️⃣ ¿Sabes configurar permisos, roles y canales? Explica tu nivel de experiencia.",
+        "📚 **Conocimientos**\n9️⃣ ¿Cuál es la función de un Moderador?",
+        "🔟 ¿Cuál es la diferencia entre un Moderador y un Administrador?",
+        "1️⃣1️⃣ ¿Qué harías antes de banear a un usuario?",
+        "1️⃣2️⃣ ¿Qué es el abuso de permisos?",
+    ],
+    "en": [
+        "👤 **Personal Information**\n1️⃣ What is your Discord username?",
+        "2️⃣ How old are you?",
+        "3️⃣ What is your timezone?",
+        "4️⃣ How many hours a day can you dedicate to the server?",
+        "💼 **Experience**\n5️⃣ Have you been Staff on other Discord servers? If yes, include in the same message: server name, role you held, how long you were there, and why you left. If not, answer 'No'.",
+        "6️⃣ Have you managed your own server?",
+        "7️⃣ Which bots do you know how to use? (Dyno, Carl-bot, Ticket Tool, MEE6, Sapphire, etc.)",
+        "8️⃣ Do you know how to configure permissions, roles and channels? Explain your experience level.",
+        "📚 **Knowledge**\n9️⃣ What is the role of a Moderator?",
+        "🔟 What's the difference between a Moderator and an Administrator?",
+        "1️⃣1️⃣ What would you do before banning a user?",
+        "1️⃣2️⃣ What is permission abuse?",
+    ],
+    "pt": [
+        "👤 **Informações Pessoais**\n1️⃣ Qual é o seu nome de usuário no Discord?",
+        "2️⃣ Quantos anos você tem?",
+        "3️⃣ Qual é o seu fuso horário?",
+        "4️⃣ Quantas horas por dia você pode dedicar ao servidor?",
+        "💼 **Experiência**\n5️⃣ Você já foi Staff em outros servidores do Discord? Se sim, inclua na mesma mensagem: nome do servidor, cargo que ocupava, tempo que ficou e motivo pelo qual saiu. Se não, responda 'Não'.",
+        "6️⃣ Você já administrou um servidor próprio?",
+        "7️⃣ Quais bots você sabe usar? (Dyno, Carl-bot, Ticket Tool, MEE6, Sapphire, etc.)",
+        "8️⃣ Você sabe configurar permissões, cargos e canais? Explique seu nível de experiência.",
+        "📚 **Conhecimentos**\n9️⃣ Qual é a função de um Moderador?",
+        "🔟 Qual é a diferença entre um Moderador e um Administrador?",
+        "1️⃣1️⃣ O que você faria antes de banir um usuário?",
+        "1️⃣2️⃣ O que é abuso de permissões?",
+    ],
+}
 
 _aplicaciones_activas = set()
 
@@ -353,7 +427,8 @@ async def iniciar_postulacion(interaction: discord.Interaction):
 
     try:
         canal_dm = await usuario.create_dm()
-        await canal_dm.send(t(gid, "apply_intro", n=len(PREGUNTAS_APPLY)))
+        preguntas = PREGUNTAS_APPLY.get(idioma_servidor.get(gid, "es"), PREGUNTAS_APPLY["es"])
+        await canal_dm.send(t(gid, "apply_intro", n=len(preguntas)))
     except discord.Forbidden:
         await interaction.response.send_message(t(gid, "apply_dm_cerrado"), ephemeral=True)
         return
@@ -367,7 +442,7 @@ async def iniciar_postulacion(interaction: discord.Interaction):
         return m.author.id == usuario.id and isinstance(m.channel, discord.DMChannel)
 
     try:
-        for pregunta in PREGUNTAS_APPLY:
+        for pregunta in preguntas:
             await canal_dm.send(pregunta)
             try:
                 respuesta = await client.wait_for("message", check=check, timeout=600)
@@ -386,7 +461,7 @@ async def iniciar_postulacion(interaction: discord.Interaction):
             )
             if usuario.display_avatar:
                 embed.set_thumbnail(url=usuario.display_avatar.url)
-            for pregunta, respuesta in zip(PREGUNTAS_APPLY, respuestas):
+            for pregunta, respuesta in zip(preguntas, respuestas):
                 pregunta_limpia = pregunta.split("\n")[-1]
                 embed.add_field(name=pregunta_limpia[:256], value=respuesta[:1000] or "-", inline=False)
             await canal_postulaciones.send(embed=embed)
@@ -395,10 +470,11 @@ async def iniciar_postulacion(interaction: discord.Interaction):
 
 
 class PanelApplyView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, etiqueta_boton="📋 Aplicar a Staff"):
         super().__init__(timeout=None)
+        self.boton_aplicar.label = etiqueta_boton
 
-    @discord.ui.button(label="📋 Aplicar a Staff", style=discord.ButtonStyle.blurple, custom_id="panel_apply_boton")
+    @discord.ui.button(style=discord.ButtonStyle.blurple, custom_id="panel_apply_boton")
     async def boton_aplicar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await iniciar_postulacion(interaction)
 
@@ -406,15 +482,16 @@ class PanelApplyView(discord.ui.View):
 @tree.command(name="apply", description="Publica el panel para que la gente aplique a Staff")
 @app_commands.checks.has_permissions(manage_guild=True)
 async def apply(interaction: discord.Interaction):
+    gid = interaction.guild.id
     embed = discord.Embed(
-        title="📋 Postulación para Staff",
-        description="¿Quieres unirte al equipo de Staff? Dale clic al botón de abajo y te vamos a hacer algunas preguntas por mensaje privado.",
+        title=t(gid, "apply_panel_titulo"),
+        description=t(gid, "apply_panel_desc"),
         color=discord.Color.blurple(),
     )
     if interaction.guild.icon:
         embed.set_thumbnail(url=interaction.guild.icon.url)
 
-    await interaction.response.send_message(embed=embed, view=PanelApplyView())
+    await interaction.response.send_message(embed=embed, view=PanelApplyView(t(gid, "apply_panel_boton")))
 
 
 # ── /reglas ──────────────────────────────────────────────────
@@ -513,6 +590,7 @@ async def nivel(interaction: discord.Interaction, usuario: discord.Member = None
 @xp.error
 @rol.error
 @apply.error
+@idioma.error
 async def comandos_error(interaction: discord.Interaction, error):
     if isinstance(error, app_commands.MissingPermissions):
         await interaction.response.send_message(t(interaction.guild.id, "sin_permiso"), ephemeral=True)
