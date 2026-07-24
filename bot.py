@@ -44,6 +44,13 @@ TEXTOS = {
         "malapalabra_mensaje": "Mensaje original",
         "malapalabra_aviso_usuario": "🚫 {usuario}, tu mensaje fue eliminado por contener lenguaje ofensivo.",
         "traducir_error": "❌ No pude traducir ese texto. Intenta de nuevo.",
+        "apply_iniciado": "📬 Te envié la postulación por mensaje privado, revisa tus DMs.",
+        "apply_dm_cerrado": "❌ No pude enviarte un mensaje privado. Activa los DMs para este servidor e inténtalo de nuevo.",
+        "apply_ya_activa": "⚠️ Ya tienes una postulación en curso, revisa tus DMs.",
+        "apply_timeout": "⌛ Se acabó el tiempo para responder. Usa /apply de nuevo si quieres intentarlo otra vez.",
+        "apply_intro": "📋 **Postulación para Staff**\nTe voy a hacer {n} preguntas, una por una. Responde cada una con un mensaje normal. Tienes 10 minutos por pregunta.",
+        "apply_final": "✅ ¡Listo! Tu postulación fue enviada al staff. Te avisarán pronto.",
+        "apply_enviada_canal": "📥 Nueva postulación de {usuario}",
     },
     "en": {
         "reglas_ok": "✅ Message sent in {canal}",
@@ -64,6 +71,13 @@ TEXTOS = {
         "malapalabra_mensaje": "Original message",
         "malapalabra_aviso_usuario": "🚫 {usuario}, your message was removed for containing offensive language.",
         "traducir_error": "❌ I couldn't translate that text. Try again.",
+        "apply_iniciado": "📬 I sent you the application by DM, check your messages.",
+        "apply_dm_cerrado": "❌ I couldn't send you a DM. Enable DMs for this server and try again.",
+        "apply_ya_activa": "⚠️ You already have an application in progress, check your DMs.",
+        "apply_timeout": "⌛ Time's up to answer. Use /apply again if you want to try once more.",
+        "apply_intro": "📋 **Staff Application**\nI'll ask you {n} questions, one at a time. Reply with a normal message. You have 10 minutes per question.",
+        "apply_final": "✅ Done! Your application was sent to staff. They'll get back to you soon.",
+        "apply_enviada_canal": "📥 New application from {usuario}",
     },
     "pt": {
         "reglas_ok": "✅ Mensagem enviada em {canal}",
@@ -84,6 +98,13 @@ TEXTOS = {
         "malapalabra_mensaje": "Mensagem original",
         "malapalabra_aviso_usuario": "🚫 {usuario}, sua mensagem foi removida por conter linguagem ofensiva.",
         "traducir_error": "❌ Não consegui traduzir esse texto. Tente novamente.",
+        "apply_iniciado": "📬 Enviei a candidatura para o seu privado, confira suas DMs.",
+        "apply_dm_cerrado": "❌ Não consegui te enviar uma DM. Ative as DMs para este servidor e tente novamente.",
+        "apply_ya_activa": "⚠️ Você já tem uma candidatura em andamento, confira suas DMs.",
+        "apply_timeout": "⌛ O tempo para responder acabou. Use /apply novamente se quiser tentar outra vez.",
+        "apply_intro": "📋 **Candidatura para Staff**\nVou fazer {n} perguntas, uma de cada vez. Responda com uma mensagem normal. Você tem 10 minutos por pergunta.",
+        "apply_final": "✅ Pronto! Sua candidatura foi enviada para o staff. Em breve entrarão em contato.",
+        "apply_enviada_canal": "📥 Nova candidatura de {usuario}",
     },
 }
 
@@ -96,6 +117,8 @@ def t(guild_id, clave, **kwargs):
 
 @client.event
 async def on_ready():
+    client.add_view(PanelApplyView())  # para que el botón siga funcionando tras reiniciar
+
     if GUILD_ID:
         guild = discord.Object(id=GUILD_ID)
         tree.copy_global_to(guild=guild)
@@ -298,6 +321,102 @@ async def traducir(interaction: discord.Interaction, texto: str, idioma: app_com
         await interaction.followup.send(t(gid, "traducir_error"), ephemeral=True)
 
 
+# ── /apply (panel de postulación de staff) ───────────────────
+CANAL_POSTULACIONES = "postulaciones"  # nombre exacto del canal donde llegan las respuestas
+
+PREGUNTAS_APPLY = [
+    "👤 **Información Personal**\n1️⃣ ¿Cuál es tu nombre de usuario en Discord?",
+    "2️⃣ ¿Qué edad tienes?",
+    "3️⃣ ¿Cuál es tu zona horaria?",
+    "4️⃣ ¿Cuántas horas al día puedes dedicar al servidor?",
+    "💼 **Experiencia**\n5️⃣ ¿Has sido Staff en otros servidores de Discord? Si tu respuesta es sí, incluye en el mismo mensaje: nombre del servidor, cargo que ocupabas, tiempo que estuviste y motivo por el que dejaste el cargo. Si no, responde 'No'.",
+    "6️⃣ ¿Has administrado un servidor propio?",
+    "7️⃣ ¿Qué bots sabes utilizar? (Dyno, Carl-bot, Ticket Tool, MEE6, Sapphire, etc.)",
+    "8️⃣ ¿Sabes configurar permisos, roles y canales? Explica tu nivel de experiencia.",
+    "📚 **Conocimientos**\n9️⃣ ¿Cuál es la función de un Moderador?",
+    "🔟 ¿Cuál es la diferencia entre un Moderador y un Administrador?",
+    "1️⃣1️⃣ ¿Qué harías antes de banear a un usuario?",
+    "1️⃣2️⃣ ¿Qué es el abuso de permisos?",
+]
+
+_aplicaciones_activas = set()
+
+
+async def iniciar_postulacion(interaction: discord.Interaction):
+    gid = interaction.guild.id
+    guild = interaction.guild
+    usuario = interaction.user
+
+    if usuario.id in _aplicaciones_activas:
+        await interaction.response.send_message(t(gid, "apply_ya_activa"), ephemeral=True)
+        return
+
+    try:
+        canal_dm = await usuario.create_dm()
+        await canal_dm.send(t(gid, "apply_intro", n=len(PREGUNTAS_APPLY)))
+    except discord.Forbidden:
+        await interaction.response.send_message(t(gid, "apply_dm_cerrado"), ephemeral=True)
+        return
+
+    await interaction.response.send_message(t(gid, "apply_iniciado"), ephemeral=True)
+
+    _aplicaciones_activas.add(usuario.id)
+    respuestas = []
+
+    def check(m: discord.Message):
+        return m.author.id == usuario.id and isinstance(m.channel, discord.DMChannel)
+
+    try:
+        for pregunta in PREGUNTAS_APPLY:
+            await canal_dm.send(pregunta)
+            try:
+                respuesta = await client.wait_for("message", check=check, timeout=600)
+                respuestas.append(respuesta.content)
+            except Exception:
+                await canal_dm.send(t(gid, "apply_timeout"))
+                return
+
+        await canal_dm.send(t(gid, "apply_final"))
+
+        canal_postulaciones = discord.utils.get(guild.text_channels, name=CANAL_POSTULACIONES)
+        if canal_postulaciones:
+            embed = discord.Embed(
+                title=t(gid, "apply_enviada_canal", usuario=str(usuario)),
+                color=discord.Color.blurple(),
+            )
+            if usuario.display_avatar:
+                embed.set_thumbnail(url=usuario.display_avatar.url)
+            for pregunta, respuesta in zip(PREGUNTAS_APPLY, respuestas):
+                pregunta_limpia = pregunta.split("\n")[-1]
+                embed.add_field(name=pregunta_limpia[:256], value=respuesta[:1000] or "-", inline=False)
+            await canal_postulaciones.send(embed=embed)
+    finally:
+        _aplicaciones_activas.discard(usuario.id)
+
+
+class PanelApplyView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="📋 Aplicar a Staff", style=discord.ButtonStyle.blurple, custom_id="panel_apply_boton")
+    async def boton_aplicar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await iniciar_postulacion(interaction)
+
+
+@tree.command(name="apply", description="Publica el panel para que la gente aplique a Staff")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def apply(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📋 Postulación para Staff",
+        description="¿Quieres unirte al equipo de Staff? Dale clic al botón de abajo y te vamos a hacer algunas preguntas por mensaje privado.",
+        color=discord.Color.blurple(),
+    )
+    if interaction.guild.icon:
+        embed.set_thumbnail(url=interaction.guild.icon.url)
+
+    await interaction.response.send_message(embed=embed, view=PanelApplyView())
+
+
 # ── /reglas ──────────────────────────────────────────────────
 @tree.command(name="reglas", description="Envía un mensaje/reglas a un canal elegido")
 @app_commands.checks.has_permissions(manage_guild=True)
@@ -393,6 +512,7 @@ async def nivel(interaction: discord.Interaction, usuario: discord.Member = None
 @kick.error
 @xp.error
 @rol.error
+@apply.error
 async def comandos_error(interaction: discord.Interaction, error):
     if isinstance(error, app_commands.MissingPermissions):
         await interaction.response.send_message(t(interaction.guild.id, "sin_permiso"), ephemeral=True)
