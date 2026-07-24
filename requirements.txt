@@ -2,3 +2,4 @@ discord.py
 PyNaCl
 yt-dlp
 python-dotenv
+deep-translator
