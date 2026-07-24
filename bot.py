@@ -106,6 +106,56 @@ async def on_ready():
     print(f"✅ Bot conectado como: {client.user}")
 
 
+# ── Traducción automática por canal (vía webhook) ────────────
+# Pon aquí el nombre exacto del canal y a qué idioma quieres que
+# se traduzca todo lo que se escriba ahí. Ejemplo:
+# CANALES_TRADUCCION = {"chat": "en", "general": "es"}
+CANALES_TRADUCCION = {
+    # "chat": "en",
+}
+
+_webhooks_cache = {}
+
+
+async def obtener_webhook(canal: discord.TextChannel) -> discord.Webhook:
+    if canal.id in _webhooks_cache:
+        return _webhooks_cache[canal.id]
+
+    webhooks = await canal.webhooks()
+    webhook = discord.utils.get(webhooks, name="traductor-bot")
+    if webhook is None:
+        webhook = await canal.create_webhook(name="traductor-bot")
+
+    _webhooks_cache[canal.id] = webhook
+    return webhook
+
+
+async def traducir_y_reenviar(message: discord.Message, idioma_destino: str):
+    try:
+        traduccion = GoogleTranslator(source="auto", target=idioma_destino).translate(message.content)
+    except Exception:
+        return
+
+    # Si ya está en el idioma destino, la traducción sale igual: no hacemos nada.
+    if traduccion.strip().lower() == message.content.strip().lower():
+        return
+
+    try:
+        await message.delete()
+    except discord.Forbidden:
+        return
+
+    try:
+        webhook = await obtener_webhook(message.channel)
+        await webhook.send(
+            content=traduccion,
+            username=message.author.display_name,
+            avatar_url=message.author.display_avatar.url,
+        )
+    except discord.Forbidden:
+        pass
+
+
 # ── Anti malas palabras (inglés) ─────────────────────────────
 import re
 
@@ -130,6 +180,12 @@ def contiene_mala_palabra(texto: str):
 async def on_message(message: discord.Message):
     if message.author.bot or not message.guild:
         return
+
+    # ── Traducción automática (si el canal está configurado) ──
+    idioma_destino = CANALES_TRADUCCION.get(message.channel.name)
+    if idioma_destino:
+        await traducir_y_reenviar(message, idioma_destino)
+        return  # el mensaje original ya se borró y se reenvió traducido
 
     palabra_detectada = contiene_mala_palabra(message.content)
     if palabra_detectada:
