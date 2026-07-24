@@ -3,6 +3,7 @@ from discord import app_commands
 import json
 import os
 from dotenv import load_dotenv
+from deep_translator import GoogleTranslator
 
 load_dotenv()  # lee las variables del archivo .env
 
@@ -42,6 +43,7 @@ TEXTOS = {
         "malapalabra_palabra": "Palabra detectada",
         "malapalabra_mensaje": "Mensaje original",
         "malapalabra_aviso_usuario": "🚫 {usuario}, tu mensaje fue eliminado por contener lenguaje ofensivo.",
+        "traducir_error": "❌ No pude traducir ese texto. Intenta de nuevo.",
     },
     "en": {
         "reglas_ok": "✅ Message sent in {canal}",
@@ -61,6 +63,7 @@ TEXTOS = {
         "malapalabra_palabra": "Detected word",
         "malapalabra_mensaje": "Original message",
         "malapalabra_aviso_usuario": "🚫 {usuario}, your message was removed for containing offensive language.",
+        "traducir_error": "❌ I couldn't translate that text. Try again.",
     },
     "pt": {
         "reglas_ok": "✅ Mensagem enviada em {canal}",
@@ -80,6 +83,7 @@ TEXTOS = {
         "malapalabra_palabra": "Palavra detectada",
         "malapalabra_mensaje": "Mensagem original",
         "malapalabra_aviso_usuario": "🚫 {usuario}, sua mensagem foi removida por conter linguagem ofensiva.",
+        "traducir_error": "❌ Não consegui traduzir esse texto. Tente novamente.",
     },
 }
 
@@ -205,6 +209,37 @@ def cargar_xp() -> dict:
 def guardar_xp(data: dict) -> None:
     with open(XP_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
+
+
+# ── /traducir ────────────────────────────────────────────────
+IDIOMAS_DISPONIBLES = [
+    app_commands.Choice(name="Español", value="es"),
+    app_commands.Choice(name="Inglés", value="en"),
+    app_commands.Choice(name="Portugués", value="pt"),
+    app_commands.Choice(name="Francés", value="fr"),
+    app_commands.Choice(name="Italiano", value="it"),
+    app_commands.Choice(name="Alemán", value="de"),
+]
+
+
+@tree.command(name="traducir", description="Traduce un texto al idioma que elijas")
+@app_commands.describe(
+    texto="El texto que quieres traducir",
+    idioma="Idioma al que quieres traducirlo",
+)
+@app_commands.choices(idioma=IDIOMAS_DISPONIBLES)
+async def traducir(interaction: discord.Interaction, texto: str, idioma: app_commands.Choice[str]):
+    gid = interaction.guild.id if interaction.guild else None
+    await interaction.response.defer()
+
+    try:
+        traduccion = GoogleTranslator(source="auto", target=idioma.value).translate(texto)
+        embed = discord.Embed(color=discord.Color.blurple())
+        embed.add_field(name="Original", value=texto[:1000], inline=False)
+        embed.add_field(name=f"Traducción ({idioma.name})", value=traduccion[:1000], inline=False)
+        await interaction.followup.send(embed=embed)
+    except Exception:
+        await interaction.followup.send(t(gid, "traducir_error"), ephemeral=True)
 
 
 # ── /reglas ──────────────────────────────────────────────────
