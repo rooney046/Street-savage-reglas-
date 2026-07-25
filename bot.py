@@ -71,6 +71,12 @@ TEXTOS = {
         "apply_panel_titulo": "📋 Postulación para Staff",
         "apply_panel_desc": "¿Quieres unirte al equipo de Staff? Dale clic al botón de abajo y te vamos a hacer algunas preguntas por mensaje privado.",
         "apply_panel_boton": "📋 Aplicar a Staff",
+        "apply_aceptado_dm": "🎉 ¡Felicidades! Tu postulación para Staff en **{servidor}** fue **aceptada**.",
+        "apply_rechazado_dm": "📪 Tu postulación para Staff en **{servidor}** fue **rechazada** esta vez. ¡Gracias por tu interés!",
+        "apply_aceptado_canal": "✅ Aceptado por {staff}",
+        "apply_rechazado_canal": "❌ Rechazado por {staff}",
+        "apply_sin_permiso_revision": "❌ No tienes permisos para revisar postulaciones.",
+        "apply_rol_no_configurado": "⚠️ Se aceptó, pero no pude asignar el rol (revisa ROL_STAFF_ID en el código).",
     },
     "en": {
         "reglas_ok": "✅ Message sent in {canal}",
@@ -102,6 +108,12 @@ TEXTOS = {
         "apply_panel_titulo": "📋 Staff Application",
         "apply_panel_desc": "Want to join the Staff team? Click the button below and we'll ask you a few questions by DM.",
         "apply_panel_boton": "📋 Apply for Staff",
+        "apply_aceptado_dm": "🎉 Congrats! Your Staff application for **{servidor}** was **accepted**.",
+        "apply_rechazado_dm": "📪 Your Staff application for **{servidor}** was **rejected** this time. Thanks for your interest!",
+        "apply_aceptado_canal": "✅ Accepted by {staff}",
+        "apply_rechazado_canal": "❌ Rejected by {staff}",
+        "apply_sin_permiso_revision": "❌ You don't have permission to review applications.",
+        "apply_rol_no_configurado": "⚠️ Accepted, but I couldn't assign the role (check ROL_STAFF_ID in the code).",
     },
     "pt": {
         "reglas_ok": "✅ Mensagem enviada em {canal}",
@@ -133,6 +145,12 @@ TEXTOS = {
         "apply_panel_titulo": "📋 Candidatura para Staff",
         "apply_panel_desc": "Quer entrar para a equipe de Staff? Clique no botão abaixo e vamos te fazer algumas perguntas por DM.",
         "apply_panel_boton": "📋 Candidatar-se a Staff",
+        "apply_aceptado_dm": "🎉 Parabéns! Sua candidatura para Staff em **{servidor}** foi **aceita**.",
+        "apply_rechazado_dm": "📪 Sua candidatura para Staff em **{servidor}** foi **rejeitada** desta vez. Obrigado pelo interesse!",
+        "apply_aceptado_canal": "✅ Aceito por {staff}",
+        "apply_rechazado_canal": "❌ Rejeitado por {staff}",
+        "apply_sin_permiso_revision": "❌ Você não tem permissão para revisar candidaturas.",
+        "apply_rol_no_configurado": "⚠️ Aceito, mas não consegui atribuir o cargo (verifique ROL_STAFF_ID no código).",
     },
 }
 
@@ -146,6 +164,7 @@ def t(guild_id, clave, **kwargs):
 @client.event
 async def on_ready():
     client.add_view(PanelApplyView())  # para que el botón siga funcionando tras reiniciar
+    client.add_view(RevisionApplyView())  # botones de aceptar/rechazar postulaciones
 
     if GUILD_ID:
         guild = discord.Object(id=GUILD_ID)
@@ -367,6 +386,7 @@ async def idioma(interaction: discord.Interaction, idioma: app_commands.Choice[s
 
 # ── /apply (panel de postulación de staff) ───────────────────
 CANAL_POSTULACIONES = "postulaciones"  # nombre exacto del canal donde llegan las respuestas
+ROL_STAFF_ID = 1523542959302115336  # rol que se le da al aceptar una postulación
 
 PREGUNTAS_APPLY = {
     "es": [
@@ -462,12 +482,85 @@ async def iniciar_postulacion(interaction: discord.Interaction, idioma_forzado: 
             )
             if usuario.display_avatar:
                 embed.set_thumbnail(url=usuario.display_avatar.url)
+            embed.set_footer(text=f"ID:{usuario.id}")
             for pregunta, respuesta in zip(preguntas, respuestas):
                 pregunta_limpia = pregunta.split("\n")[-1]
                 embed.add_field(name=pregunta_limpia[:256], value=respuesta[:1000] or "-", inline=False)
-            await canal_postulaciones.send(embed=embed)
+            await canal_postulaciones.send(embed=embed, view=RevisionApplyView())
     finally:
         _aplicaciones_activas.discard(usuario.id)
+
+
+class RevisionApplyView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    def _extraer_usuario_id(self, interaction: discord.Interaction) -> int:
+        embed = interaction.message.embeds[0]
+        texto_footer = embed.footer.text or ""
+        return int(texto_footer.replace("ID:", "").strip())
+
+    async def _finalizar(self, interaction: discord.Interaction, aceptado: bool):
+        gid = interaction.guild.id
+
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(t(gid, "apply_sin_permiso_revision"), ephemeral=True)
+            return
+
+        usuario_id = self._extraer_usuario_id(interaction)
+        miembro = interaction.guild.get_member(usuario_id)
+        if miembro is None:
+            try:
+                miembro = await interaction.guild.fetch_member(usuario_id)
+            except discord.NotFound:
+                miembro = None
+
+        embed = interaction.message.embeds[0]
+        aviso_extra = None
+
+        if aceptado:
+            embed.color = discord.Color.green()
+            embed.add_field(name="—", value=t(gid, "apply_aceptado_canal", staff=interaction.user.mention), inline=False)
+            if miembro and ROL_STAFF_ID:
+                rol = interaction.guild.get_role(ROL_STAFF_ID)
+                if rol:
+                    try:
+                        await miembro.add_roles(rol)
+                    except discord.Forbidden:
+                        aviso_extra = t(gid, "apply_rol_no_configurado")
+                else:
+                    aviso_extra = t(gid, "apply_rol_no_configurado")
+            elif miembro and not ROL_STAFF_ID:
+                aviso_extra = t(gid, "apply_rol_no_configurado")
+
+            if miembro:
+                try:
+                    await miembro.send(t(gid, "apply_aceptado_dm", servidor=interaction.guild.name))
+                except discord.Forbidden:
+                    pass
+        else:
+            embed.color = discord.Color.red()
+            embed.add_field(name="—", value=t(gid, "apply_rechazado_canal", staff=interaction.user.mention), inline=False)
+            if miembro:
+                try:
+                    await miembro.send(t(gid, "apply_rechazado_dm", servidor=interaction.guild.name))
+                except discord.Forbidden:
+                    pass
+
+        for item in self.children:
+            item.disabled = True
+
+        await interaction.response.edit_message(embed=embed, view=self)
+        if aviso_extra:
+            await interaction.followup.send(aviso_extra, ephemeral=True)
+
+    @discord.ui.button(label="✅ Aceptar", style=discord.ButtonStyle.success, custom_id="apply_aceptar")
+    async def boton_aceptar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._finalizar(interaction, aceptado=True)
+
+    @discord.ui.button(label="❌ Rechazar", style=discord.ButtonStyle.danger, custom_id="apply_rechazar")
+    async def boton_rechazar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._finalizar(interaction, aceptado=False)
 
 
 class SeleccionIdiomaApplyView(discord.ui.View):
