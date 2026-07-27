@@ -1,4 +1,4 @@
-import discord
+ñimport discord
 from discord import app_commands
 import json
 import os
@@ -406,4 +406,4 @@ PREGUNTAS_APPLY = {
         "3️⃣ What is your timezone?",
         "4️⃣ How many hours a day can you dedicate to the server?",
         "💼 **Experience**\n5️⃣ Have you been Staff on other Discord servers? If yes, include in the same message: server name, role you held, how long you were there, and why you left. If not, answer 'No'.",
-        "6️⃣ Have you managed your own server?
+         "6\u20e3 Have you managed your own server?",
